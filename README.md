@@ -9,6 +9,6 @@ go into your .minecraft\saves\ folder, open your world save, there should be a f
 digtunnel is a simple tunnel digger script.
 setup: put down a mining turtle facing in the direction you want to dig the tunnel. in that direction, place chests with materials (default: coal and stone) above and/or below the path the turtle will go. one of them should be empty, that will be used to empty the turtle inventory. don't let spaces between the chests. the first point when it moves forward where it doesn't find a chest, marks the start.
 
-version 1.0: stable, 100% working
-version 1.1 (beta): preparing for upgrade, adding a virtual inventory to search faster through it. (not enough tested to say if it is running correctly.
-future plans: player builds a section of a tunnel design, the turtle mines it down and creates copies of it for the whole tunnel.
+- version 1.0: stable, 100% working
+- version 1.1 (beta): preparing for upgrade, adding a virtual inventory to search faster through it. (will 100% not work correctly ;)
+- future plans: player builds a section of a tunnel design, the turtle mines it down and creates copies of it for the whole tunnel.
