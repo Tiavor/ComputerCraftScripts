@@ -1,64 +1,161 @@
-local chest= "minecraft:chest"
-local chest2="minecraft:trapped_chest"
-local stone= "minecraft:stone"
-local coal=  "minecraft:coal"
-local sand=  "minecraft:sand"
-local gravel="minecraft:gravel"
+local ref={	chest= "minecraft:chest",
+			chest2="minecraft:trapped_chest",
+			stone= "minecraft:stone",
+			coal=  "minecraft:coal",
+			sand=  "minecraft:sand",
+			gravel="minecraft:gravel"}
 local doCeiling=true
 local findfirst=false
+local buildTunnel=false
+
+-- priorities: 	-1 = do not use this block
+-- 				0-3 places blocks with higher number first (per row)
+local blockProperties={["minecraft:sapling"]={priority=0,placeDefault},
+				["minecraft:bedrock"]={priority=-1},
+				["minecraft:flowing_water"]={priority=-1},
+				["minecraft:water"]={priority=0,placeWater},
+				["minecraft:flowing_lava"]={priority=-1},
+				["minecraft:lava"]={priority=0,placeWater},
+				["minecraft:log"]={priority=1,placeWithRot},
+				["minecraft:leaves"]={priority=0,placeDefault},
+				["minecraft:tallgrass"]={priority=0,placeDefault},
+				["minecraft:deadbush"]={priority=0,placeDefault},
+				["minecraft:yellow_flower"]={priority=0,placeDefault},
+				["minecraft:red_flower"]={priority=0,placeDefault},
+				["minecraft:browen_mushroom"]={priority=0,placeDefault},
+				["minecraft:red_mushroom"]={priority=0,placeDefault},
+				["minecraft:lit_redstone_ore"]={priority=0,placeTorch},
+				["minecraft:unlit_redstone_torch"]={priority=0,placeTorch},
+				["minecraft:redstone_torch"]={priority=0,placeTorch},
+				["minecraft:snow_layer"]={priority=0,placeDefault},
+				["minecraft:cactus"]={priority=0,placeDefault},
+				["minecraft:reeds"]={priority=0,placeDefault},
+				["minecraft:pumpkin"]=placeHRot,
+				["minecraft:brown_mushroom_block"]=1,
+				["minecraft:red_mushroom_block"]=1,
+				["minecraft:vine"]={priority=0,placeDefault},
+				["minecraft:waterlily"]=-1,
+				["minecraft:coca"]=-1,
+				["minecraft:leaves2"]=-1,
+				["minecraft:log2"]=1,
+				["minecraft:double_plant"]={priority=-1},
+				["minecraft:fire"]=-1,
+				["minecraft:dispenser"]=2,
+				["minecraft:sticky_piston"]=1,
+				["minecraft:stone_slab"]=1,
+				["minecraft:tnt"]={priority=-1},
+				["minecraft:mob_spawner"]={priority=-1},
+				["minecraft:torch"]=3,
+				["minecraft:oak_stairs"]=1,
+				["minecraft:chest"]=2,
+				["minecraft:redstone_wire"]=-1,
+				["minecraft:wheat"]=-1,
+				["minecraft:furnace"]=2,
+				["minecraft:wooden_door"]=placeDoor,
+				["minecraft:ladder"]=-1,
+				["minecraft:rail"]=-1,
+				["minecraft:lever"]={priority=0,placeTorch},
+				["minecraft:stone_pressure_plate"]=-1,
+				["minecraft:stone_button"]={priority=0,placeTorch},
+				["minecraft:fence"]=3,
+				["minecraft:unpowered_repeater"]=placeRedstone,
+				["minecraft:sandstone_stairs"]=placeStairs,
+				["minecraft:tripwire_hook"]=-1,
+				["minecraft:portal"]={priority=-1},
+				["minecraft:nether_brick_stairs"]=placeStairs,
+				["minecraft:nether_wart"]=-1,
+				["minecraft:end_portal"]={priority=-1},
+				["minecraft:lit_redstone_lamp"]=placeSomethingelse,
+				["minecraft:powered_repeater"]=placeSomethingelse,
+				["minecraft:ender_chest"]={priority=-1},
+				["minecraft:tripwire"]=-1,
+				["minecraft:spruce_stairs"]=placeStairs,
+				["minecraft:birch_stairs"]=placeStairs,
+				["minecraft:jungle_stairs"]=placeStairs,
+				["minecraft:bed"]=placeBed,
+				["minecraft:golden_rail"]=placeRedstone,
+				["minecraft:detector_rail"]=placeRedstone,
+				["minecraft:piston_head"]={priority=-1},
+				["minecraft:piston_extension"]={priority=-1},
+				["minecraft:double_stone_slab"]=placeDoubleslab,
+				["minecraft:standing_sign"]]=placeStandingSign,
+				["minecraft:lit_furnace"]=placeSomethingelse,
+				["minecraft:iron_door"]=placeDoor,
+				["minecraft:wall_sign"]=placeWallsign,
+				["minecraft:wooden_button"]=placeTorch,
+				["minecraft:skull"]=placeSkull,
+				["minecraft:anvil"]=placeLast,
+				["minecraft:trapped_chest"]=2,
+				["minecraft:unpowered_comparator"]=3,
+				["minecraft:powered_comparator"]=3,
+				["minecraft:hopper"]=3,
+				["minecraft:activator_rail"]=placeRedstone,
+				["minecraft:dropper"]=2,
+				["minecraft:wall_banner"]=3,
+				["minecraft:standing_banner"]=3,
+				["minecraft:spruce_fence_gate"]=3,
+				["minecraft:birch_fence_gate"]=3,
+				["minecraft:jungle_fence_gate"]=3,
+				["minecraft:dark_oak_fence_gate"]=3,
+				["minecraft:acacia_fence_gate"]=3,
+				["minecraft:spruce_door"]=3,
+				["minecraft:birch_door"]=3,
+				["minecraft:jungle_door"]]=3,
+				["minecraft:acacia_door"]]=3,
+				["minecraft:dark_oak_door"]]=3,
+				["minecraft:quarz_stairs"]=3,
+				["minecraft:quartz_block"]]=3,
+				["minecraft:light_weighted_pressure_plate"]=-1,
+				["minecraft:heavy_weighted_pressure_plate"]=-1}
 
 --do not change anything below
 local tArgs={...}
-local acX=0
-local acY=0
-local acZ=0
-local acDir=0 -- 0=ahead, 1=right, 2=behind, 3=left from starting point
-local sizeRight
-local sizeUp
-local sizeLength
-local isRefueling=false
-local dumpX=0 --only x coordinate, Y and Z are 0 as it should be setup
-local dumpSide=true --true=up, false=down
-local coalX=0
-local coalSide=true
-local stoneX=0
-local stoneSide=true
-local startX=0
+local relCo={acX=0,acY=0,acZ=0,acDir=0} -- 0=ahead, 1=right, 2=behind, 3=left from starting point
+local absCo={acX=0,acY=0,acZ=0,acDir=0}
+local size={right,up,length}
+local startPar -- ={coal={x=1,up=true}}
+--local startPar={dump=0,coal=0,stone=0,start=0} -- only x coordinate, Y and Z are 0 as it should be setup
+--local startParS={coal=true,stone=true,dump=true}--true=up, false=down
 local offset=0
-local reportText={a="",b="",c="",d=""}
-local errorText={a="",b="",c=""}
+local reportText={"","","",""}
+local errorText={"","",""}
 local completion=0
+local isRefueling=false
 local prepareComplete=false
-local virtualSpace={"","","","",
-					"","","","",
-					"","","","",
-					"","","",""}
+local virtualInventory={"","","","", "","","","", "","","","", "","","",""}
+local virtualTemplate --  [[[[blockname,rotation,data],nextblock_Z,...],nextline_Y,...],nextrow_X,...] built in order x->X(y->Y(z->Z))
+local templateSize={x=0,y=0,z=0}
+local template
+--  3:place 1st, special treatment
+--  2:place 2nd, with horizontal rotation, e.g. chest, furnace; not pushable
+--  1:place 3rd, with rotation and pushable; use pistons
+--  0:place 4th, normal block, place from next row, no rotation
+-- -1:place 5th, no rotation but depend on other blocks, e.g. leaves, flowers
+-- -2:do not use these blocks
 
 -- ### helper functions ### --
 function report(...)
 	local args={...}
 	if #args>0 and args[0]~= nil then
-		reportText={a=reportText.b,b=reportText.c,c=reportText.d,d=args[0]}
+		reportText={reportText[2],reportText[3],reportText[4],args[0]}
 	end
 	term.clear()
 	term.setCursorPos(1,1)
-	print("X:"..acX.." Z:"..acZ.." Y:"..acY.." dir:"..acDir
+	print("X:"..relCo.acX.." Z:"..relCo.acZ.." Y:"..relCo.acY.." dir:"..relCo.acDir
 	.."\nFuel: "..turtle.getFuelLevel()
 	.."\ndistance from spawn: "..getDistanceFromSpawn()
 	.."\ncompletion status: "..completion.."%"
-	.."\n\n"..reportText.a
-	.."\n"..reportText.b
-	.."\n"..reportText.c
-	.."\n"..reportText.d)
-	if errorText.a~="" then
-		print("last Errors:"
-		.."\n"..errorText.a
-		.."\n"..errorText.b
-		.."\n"..errorText.c)
+	.."\n"..reportText[4])
+	if errorText[3]~="" then
+		print("last Error:"
+		.."\n"..errorText[3])
+	end
+	for i=1,4 do
+		term.write(virtualInventory[i])
 	end
 end
 function reportError(text)
-	errorText={a=errorText.b,b=errorText.c,c=text}
+	errorText={errorText[2],errorText[3],text}
 	report()
 end
 
@@ -67,83 +164,74 @@ function compareItem(name)
 		return false
 	end
 	local data=turtle.getItemDetail()
-	if data.name==name then
-		return true
-	else
-		return false
-	end
+	return data.name==name
 end
-function compareBlockDown(block)
+function compareBlockDown(name)
 	local ok,data=turtle.inspectDown()
 	if ok then
-		if data.name==block then
-			return true
-		end
+		return data.name==name
 	end
 	return false
 end
-function compareBlockUp(block)
+function compareBlockUp(name)
 	local ok,data=turtle.inspectUp()
 	if ok then
-		return data.name==block
+		return data.name==name
 	end
 	return false
 end
-function compareBlock(block)
+function compareBlock(name)
 	local ok,data=turtle.inspect()
 	if ok then
-		return data.name==block
+		return data.name==name
 	end
 	return false
 end
 function isChestAbove()
-	return (compareBlockUp(chest) or compareBlockUp(chest2))
+	return (compareBlockUp(ref.chest) or compareBlockUp(ref.chest2))
 end
 function isChestBelow()
-	return (compareBlockDown(chest) or compareBlockDown(chest2))
+	return (compareBlockDown(ref.chest) or compareBlockDown(ref.chest2))
 end
 
 function getXpos(item)
-	if item==coal then
-		report("need pos of coal deposit "..coalX)
-		return coalX
-	elseif item==stone then
-		report("need pos of stone deposit "..stoneX)
-		return stoneX
+	if startPar[item] ~= nil then
+		return startPar[item].x
+	end
+	if item==ref.coal then
+		report("need pos of coal deposit "..startPar.coal)
+		return startPar.coal
+	elseif item==ref.stone then
+		report("need pos of stone deposit "..startPar.stone)
+		return startPar.stone
 	else
-		report("need pos of block dump "..dumpX)
-		return dumpX
+		report("need pos of block dump "..startPar.dump)
+		return startPar.dump
 	end
 end
 function getUpChest(item)
 	if item==coal then
-		return coalSide
+		return startParS.coal
 	elseif item==stone then
-		return stoneSide
+		return startParS.stone
 	else
-		return dumpSide
+		return startParS.dump
 	end
 end
 
 function select(name) -- selects the next slot with at least one in it, also full stacks; returns false if nothing found
-	--print("selecting slot with "..name)
-	local old=turtle.getSelectedSlot()
 	for i=1,16 do
-		turtle.select(i)
-		if (turtle.getItemCount() > 0) and compareItem(name) then
-			--print("found at "..i)
+		if virtualInventory[i] ~="" and virtualInventory[i][1]==block then
+			turtle.select(i)
 			return true
 		end
 	end
-	turtle.select(old)
-	--report("no items found")
 	return false
 end
-function selectB(name) -- selects the next not full stack or free slot; returns false if no free space left and no not-full stacks found
+function selectB(name) -- selects the next not full stack or free slot after all slots are checked; returns false if no free space left and no not-full stacks found
 	for i=1,16 do
-		turtle.select(i)
-		if (turtle.getItemCount() > 0) and (turtle.getItemCount() < 64) and compareItem(name) then
-			--print("found at "..i)
+		if virtualInventory[i] ~="" and virtualInventory[i][1]==block and virtualInventory[i][2]<64 then
+			turtle.select(i)
 			return true
 		end
 	end
@@ -152,22 +240,17 @@ end
 function selectFreeSlot()
 	--print("selecting next free slot")
 	for i=1,16 do
-		if turtle.getItemCount(i) == 0 then
+		if virtualInventory[i] == "" then
 			turtle.select(i)
 			return true
 		end
 	end
 	return false
 end
-function checkFreeSpace(block)
-	for i=1,16 do
-		if virtualSpace[i][2] == "" or (virtualSpace[i][1]==block and virtualSpace[i][2]<64) then
-			return true
-		end
-	end
-	return false
-end
 
+function shortName(name)
+	return string.sub(name,11)
+end
 function getItem(...) -- [slot] ; may return nil, check if there is an item in the selected or specified slot
 	args={...}
 	local slot=turtle.getSelectedSlot()
@@ -211,25 +294,31 @@ function registerChestUp()
 		--endProgram no free slot
 	end
 	if turtle.suckUp(1) then
-		if compareItem(coal) then
-			report("coal "..acX)
-			coalX=acX
-			coalSide=true
-		elseif compareItem(stone) then
-			report("stone "..acX)
-			stoneX=acX
-			stoneSide=true
-		else
-			report("dump "..acX)
-			dumpX=acX
-			dumpSide=true
-			report("unknown=>dump")
+		local item=getItem()
+		if item==nil then
+			reportError("got Item from chest but nothing was found in Inventory")
+			read()
 		end
+		report(item..relCo.acX)
+		startPar[item]={x=relCo.acX,up=true}
 		turtle.dropUp(1)
+		if item==ref.coal and turtle.getFuelLevel() <3000 then
+			turtle.suckUp(64)
+			turtle.refuel()
+		end
 	else
-		report("dump "..acX)
-		dumpX=acX
-		dumpSide=true
+		report("dump "..relCo.acX)
+		startPar.dump=relCo.acX
+		startParS.dump=true
+		local n=getNextFromInv()
+		while n~=false do
+			if n~=false then
+				turtle.select(n)
+				turtle.dropUp()
+				remFromInv()
+			end
+			n=getNextFromInv()
+		end
 	end
 end
 function registerChestDown()
@@ -240,61 +329,67 @@ function registerChestDown()
 		--endProgram no free slot
 	end
 	if turtle.suckDown(1) then
-		if compareItem(coal) then
-			report("coal "..acX)
-			coalX=acX
-			coalSide=false
-		elseif compareItem(stone) then
-			report("stone "..acX)
-			stoneX=acX
-			stoneSide=false
-		else
-			report("dump "..acX)
-			dumpX=acX
-			dumpSide=false
-			report("unknown")
+		local item=getItem()
+		if item==nil then
+			reportError("got Item from chest but nothing was found in Inventory")
+			read()
 		end
+		report(item..relCo.acX)
+		startPar[item]={x=relCo.acX,up=false}
 		turtle.dropDown(1)
+		if item==ref.coal and turtle.getFuelLevel() <3000 then
+			turtle.suckDown(64)
+			turtle.refuel()
+		end
 	else
-		report("dump "..acX)
-		dumpX=acX
-		dumpSide=false
+		report("dump "..relCo.acX)
+		startPar.dump=relCo.acX
+		startParS.dump=false
+		local n=getNextFromInv()
+		while n~=false do
+			if n~=false then
+				turtle.select(n)
+				turtle.dropDown()
+				remFromInv()
+			end
+			n=getNextFromInv()
+		end
 	end
 end
 -- unloading and refuel
 function unloadBlocks() -- will save position and return to it at the end
 	report("unloading blocks")
-	local lastpos={x=acX,y=acY,z=acZ,dir=acDir}
-	goto(startX,0,0)
-	while select(coal) do
+	local lastpos={x=relCo.acX,y=relCo.acY,z=relCo.acZ,dir=relCo.acDir}
+	goto(startPar.start,0,0)
+	while select(ref.coal) do
 		if turtle.getFuelLevel() < getDistanceFromSpawn(lastX)*40+1500 then
 			turtle.refuel()
-			removeFromVirtual(turtle.getSelectedSlot())
+			remFromInv(turtle.getSelectedSlot())
 		else
-			goto(coalX,0,0)
-			if getUpChest(coal) then
-				removeFromVirtual(i)
+			goto(startPar[ref.coal].x,0,0)
+			if getUpChest(ref.coal) then
+				remFromInv(i)
 				turtle.dropUp()
 			else
-				removeFromVirtual(i)
+				remFromInv(i)
 				turtle.dropDown()
 			end
 		end
 	end
-	goto(dumpX,0,0)
+	goto(startPar.dump,0,0)
 	local c1=0
 	local c2=0
 	--if select(coal) then
 	--	c1=turtle.getSelectedSlot()
 	--end
-	if select(stone) then
+	if select(ref.stone) then
 		c2=turtle.getSelectedSlot()
 	end
 	if getUpChest("dump") then
 		for i=1,16 do
 			if i~=c1 and i~=c2 then
 				turtle.select(i)
-				removeFromVirtual(i)
+				remFromInv(i)
 				turtle.dropUp()
 			end
 		end
@@ -302,22 +397,31 @@ function unloadBlocks() -- will save position and return to it at the end
 		for i=1,16 do
 			if i~=c1 and i~=c2 then
 				turtle.select(i)
-				removeFromVirtual(i)
+				remFromInv(i)
 				turtle.dropDown()
 			end
 		end
 	end
-	goto(startX,0,0)
+	goto(startPar.start,0,0)
 	gotoB(lastpos)
 end
-function refuelBlocks(item,quant) -- will save position and return to it at the end
+function refuelBlocks(...) -- will save position and return to it at the end
+	local item=args[1]
+	local quant=args[2]
+	local isSubRefuel=false
+	if #args==3 then
+		isSubRefuel=args[3]
+	end
 	report("refuling "..quant.." of "..item)
-	isRefueling=true
-	local lastpos={x=acX,y=acY,z=acZ,dir=acDir}
-	goto(startX,0,0)
-	unloadBlocks()
+	local lastpos={x=relCo.acX,y=relCo.acY,z=relCo.acZ,dir=relCo.acDir}
+	if not isSubRefuel then
+		isRefueling=true
+		goto(startPar.start,0,0)
+		unloadBlocks()
+	end
 	if quant > 64 then
-		refuelBlocks(item,quant-64)
+		refuelBlocks(item,quant-64,true)
+		quant=64
 	end
 	local x=getXpos(item)
 	goto(x,0,0)
@@ -325,45 +429,47 @@ function refuelBlocks(item,quant) -- will save position and return to it at the 
 	if getUpChest(item) then
 		selectB(item)
 		if turtle.suckUp(quant) then
-			addToVirtual(item,quant)
+			addToInv(item,quant)
 		else
 			reportError("need more supply of "..item)
 			for i=1,quant do
 				if not turtle.suckUp(1) then
 					read()
 				end
-				addToVirtual(item)
+				addToInv(item)
 			end
 		end
 	else
 		if turtle.suckDown(quant) then
-			addToVirtual(item,quant)
+			addToInv(item,quant)
 		else
 			reportError("need more supply of "..item)
 			for i=1,quant do
 				if not turtle.suckDown(1) then
 					read()
 				end
-				addToVirtual(item)
+				addToInv(item)
 			end
 		end
 	end
 	if item==coal then
 		select(coal)
 		turtle.refuel()
-		removeFromVirtual(turtle.getSelectedSlot())
+		remFromInv(turtle.getSelectedSlot())
 	end
-	report("refuel complete, returning")
-	isRefueling=false
-	goto(startX,0,0)
-	gotoB(lastpos)
+	if not isSubRefuel then
+		report("refuel complete, returning")
+		isRefueling=false
+		goto(startPar.start,0,0)
+		gotoB(lastpos)
+	end
 end
 function checkFuel()
 	--report("checking fuelstate")
 	if turtle.getFuelLevel() < getDistanceFromSpawn()*90+50 then
 		if select(coal) then
 			turtle.refuel()
-			removeFromVirtual(turtle.getSelectedSlot())
+			remFromInv(turtle.getSelectedSlot())
 		else
 			refuelBlocks(coal,math.floor(getDistanceFromSpawn()/40)+32)
 		end
@@ -374,50 +480,80 @@ function checkFuel()
 	end
 end
 -- virtual inventory
-function addToVirtual(...) -- block,[count]
+function addToInv(...) -- block,[count]
 	local args={...}
-	if #args<2 then
-		reportError("codeErr: not enough arguments for addToVirtual")
+	if #args<1 then
+		reportError("codeErr: not enough arguments for addToInv")
 		read()
 	end
 	local block=args[2]
 	local i=turtle.getSelectedSlot()
 	if #args==2 then
-		if virtualSpace[i]=="" then
-			virtualSpace[i]={block,args[2]}
+		if virtualInventory[i]=="" then
+			virtualInventory[i]={block,args[2]}
+			return true
 		else
-			virtualSpace[i]={block,virtualSpace[i][2]+args[2]}
+			virtualInventory[i]={block,virtualInventory[i][2]+args[2]}
+			return true
 		end
 	else
-		if virtualSpace[i]=="" then
-			virtualSpace[i]={block,1}
+		if virtualInventory[i]=="" then
+			virtualInventory[i]={block,1}
+			return true
 		else
-			virtualSpace[i]={block,virtualSpace[i][2]+1}
+			virtualInventory[i]={block,virtualInventory[i][2]+1}
+			return true
 		end
 	end
+	return false
 end
-function removeFromVirtual(...) --slot,[count]
+function remFromInv(...) --slot,[count]
 	local args={...}
-	if #args<1 then
-		reportError("codeErr: not enough arguments for removeFromVirtual")
-		return
-	end
-	local slot=args[1]
 	if #args==2 then
-		if virtualSpace[slot][2]==1 then
-			virtualSpace[slot]=""
-		else
-			virtualSpace[slot][2]=virtualSpace[slot][2]-args[2]
+		local slot=args[1]
+		local count=virtualInventory[slot][2]
+		if count==args[2] then
+			virtualInventory[slot]=""
+			return true
+		elseif count>args[2]
+			virtualInventory[slot][2]=virtualInventory[slot][2]-args[2]
+			return true
+		end
+	elseif #args==1 then
+		local slot=args[1]
+		virtualInventory[slot]=""
+		return true
+	elseif #args==0 then
+		virtualInventory[turtle.getSelectedSlot()]=""
+		return true
+	end
+	return false
+end
+function getNextFromInv(...)
+	local args={...}
+	if #args==0 then
+		for i=1,16 do
+			if virtualInventory[i]~="" then
+				return i
+			end
 		end
 	else
-		virtualSpace[slot]=""
+		for i=1,16 do
+			if virtualInventory[i]~="" and virtualInventory[i][1] == args[1]
+				then return i
+			end
+		end
 	end
+	return false
 end
-
+-- virtual template
+function addToTemplate(t,x,y,z,r)
+	
+end
 
 -- ### movement ### --
 function getDistanceFromSpawn()
-	return math.abs(acX)+math.abs(acY)+math.abs(acZ)
+	return math.abs(relCo.acX)+math.abs(relCo.acY)+math.abs(relCo.acZ)
 end
 
 function fwd()
@@ -436,14 +572,14 @@ function fwd()
 			return
 		end
 	end
-	if acDir==0 then --same direction as original
-		acX=acX+1
-	elseif acDir==1 then --right of original
-		acZ=acZ+1
-	elseif acDir==2 then --behind original
-		acX=acX-1
+	if relCo.acDir==0 then --same direction as original
+		relCo.acX=relCo.acX+1
+	elseif relCo.acDir==1 then --right of original
+		relCo.acZ=relCo.acZ+1
+	elseif relCo.acDir==2 then --behind original
+		relCo.acX=relCo.acX-1
 	else --lastdir==3 --left of original
-		acZ=acZ-1
+		relCo.acZ=relCo.acZ-1
 	end
 	report()
 	if prepareComplete and not isRefueling then
@@ -452,14 +588,14 @@ function fwd()
 end
 function back()
 	if turtle.back() then
-		if acDir==0 then --same direction as original
-			acX=acX-1
-		elseif acDir==1 then --right of original
-			acZ=acZ-1
-		elseif acDir==2 then --behind original
-			acX=acX+1
+		if relCo.acDir==0 then --same direction as original
+			relCo.acX=relCo.acX-1
+		elseif relCo.acDir==1 then --right of original
+			relCo.acZ=relCo.acZ-1
+		elseif relCo.acDir==2 then --behind original
+			relCo.acX=relCo.acX+1
 		else --lastdir==3 --left of original
-			acZ=acZ+1
+			relCo.acZ=relCo.acZ+1
 		end
 		report()
 	else
@@ -471,14 +607,14 @@ function back()
 	end
 end
 function up()
-	if x<startX then
+	if x<startPar.start then
 		reportError("some weired shit happened")
 		read()
 	end
 	for i=0,50 do
 		if turtle.up() then
 			--print("moved up")
-			acY=acY+1
+			relCo.acY=relCo.acY+1
 			report()
 			return
 		end
@@ -492,14 +628,14 @@ function up()
 	read()
 end
 function down()
-	if x<startX then
+	if x<startPar.start then
 		reportError("some weired shit happened")
 		read()
 	end
 	for i=0,50 do
 		if turtle.down() then
 			--print("moved down")
-			acY=acY-1
+			relCo.acY=relCo.acY-1
 			report()
 			return
 		end
@@ -514,40 +650,40 @@ function down()
 end
 
 function turn(dir)
-	if acDir-dir==1 or acDir-(dir-4)==1 then
+	if relCo.acDir-dir==1 or relCo.acDir-(dir-4)==1 then
 		turnL()
 	end
-	while acDir~=dir do
+	while relCo.acDir~=dir do
 		turnR()
 	end
 end
 function turnL()
 	if turtle.turnLeft() then
-		if acDir==0 then
-			acDir=3
+		if relCo.acDir==0 then
+			relCo.acDir=3
 		else
-			acDir=acDir-1
+			relCo.acDir=relCo.acDir-1
 		end
 	end
 	report()
 end
 function turnR()
 	if turtle.turnRight() then
-		if acDir==3 then
-			acDir=0
+		if relCo.acDir==3 then
+			relCo.acDir=0
 		else
-			acDir=acDir+1
+			relCo.acDir=relCo.acDir+1
 		end
 	end
 	report()
 end
 --dig and remember stuff in virtual inventory
 function dig()
-	if not checkFreeSpace(getBlock()) then
+	while not selectB(getBlock()) do
 		unloadBlocks()
 	end
-	if turtle.detect() and selectB(block) then
-		if not addToVirtual(getBlock()) then
+	if turtle.detect() then
+		if not addToInv(getBlock()) then
 			return false
 		end
 		turtle.dig()
@@ -556,11 +692,11 @@ function dig()
 	return false
 end
 function digUp()
-	if not checkFreeSpace(getBlockUp()) then
+	while not selectB(getBlockUp()) do
 		unloadBlocks()
 	end
-	if turtle.detectUp() and selectB(block) then
-		if not addToVirtual(getBlockUp()) then
+	if turtle.detectUp() then
+		if not addToInv(getBlockUp()) then
 			return false
 		end
 		turtle.digUp()
@@ -569,11 +705,11 @@ function digUp()
 	return false
 end
 function digDown()
-	if not checkFreeSpace(getBlockDown()) then
+	while not selectB(getBlockDown()) do
 		unloadBlocks()
 	end
-	if turtle.detectDown() and selectB(block) then
-		if not addToVirtual(getBlockDown()) then
+	if turtle.detectDown() then
+		if not addToInv(getBlockDown()) then
 			return false
 		end
 		turtle.digDown()
@@ -584,10 +720,10 @@ end
 --goto position--
 function savePos()
 	report("saving positions")
-	lastX=acX
-	lastY=acY
-	lastZ=acZ
-	lastDir=acDir
+	lastX=relCo.acX
+	lastY=relCo.acY
+	lastZ=relCo.acZ
+	lastDir=relCo.acDir
 end
 function goto(...) -- goto xpos,ypos,zpos[,dir] -> z,y,x
 	local Args={...}
@@ -600,25 +736,25 @@ function goto(...) -- goto xpos,ypos,zpos[,dir] -> z,y,x
 	elseif #Args==4 then
 		pos={x=Args[1],y=Args[2],z=Args[3],dir=Args[4]}
 	end
-	while acZ<pos.z do
+	while relCo.acZ<pos.z do
 		turn(1)
 		fwd()
 	end
-	while acZ>pos.z do
+	while relCo.acZ>pos.z do
 		turn(3)
 		fwd()
 	end
-	while acY>pos.y do
+	while relCo.acY>pos.y do
 		down()
 	end
-	while acY<pos.y do
+	while relCo.acY<pos.y do
 		up()
 	end
-	while acX<pos.x do
+	while relCo.acX<pos.x do
 		turn(0)
 		fwd()
 	end
-	while acX>pos.x do
+	while relCo.acX>pos.x do
 		turn(2)
 		fwd()
 	end
@@ -638,25 +774,25 @@ function gotoB(...) -- reverse goto -> x,y,z
 	elseif #Args==4 then
 		pos={x=Args[1],y=Args[2],z=Args[3],dir=Args[4]}
 	end
-	while acX<pos.x do
+	while relCo.acX<pos.x do
 		turn(0)
 		fwd()
 	end
-	while acX>pos.x do
+	while relCo.acX>pos.x do
 		turn(2)
 		fwd()
 	end
-	while acY>pos.y do
+	while relCo.acY>pos.y do
 		down()
 	end
-	while acY<pos.y do
+	while relCo.acY<pos.y do
 		up()
 	end
-	while acZ<pos.z do
+	while relCo.acZ<pos.z do
 		turn(1)
 		fwd()
 	end
-	while acZ>pos.z do
+	while relCo.acZ>pos.z do
 		turn(3)
 		fwd()
 	end
@@ -665,20 +801,20 @@ function gotoB(...) -- reverse goto -> x,y,z
 	end
 end
 function reset()
-	goto(startX,0,0)
+	goto(startPar.start,0,0)
 	unloadBlocks()
 	goto(0,0,0,0)
 end
 function repos()
 	report("repositioning")
-	while acY>0 do
+	while relCo.acY>0 do
 		down()
 	end
-	while acZ>0 do
+	while relCo.acZ>0 do
 		turn(3)
 		fwd()
 	end
-	while acZ<0 do
+	while relCo.acZ<0 do
 		turn(1)
 		fwd()
 	end
@@ -687,11 +823,12 @@ end
 
 
 -- ### program specific parts ### --
+--tunnel program
 function wallup()
 	fwd()
 	local i=0
-	while acY<sizeUp-1 do
-		if compareBlockUp(stone) then
+	while relCo.acY<size.up-1 do
+		if compareBlockUp(ref.stone) then
 			break
 		end
 		i=i+1
@@ -700,67 +837,127 @@ function wallup()
 	while i>0 do
 		down()
 		i=i-1
-		if select(stone) then
+		if select(ref.stone) then
 			while not turtle.placeUp() do
 				digUp()
 			end
 		else
-			refuelBlocks(stone,64)
+			refuelBlocks(ref.stone,64)
 			turtle.placeUp()
 		end
 	end
 	back()
-	if select(stone) then
+	if select(ref.stone) then
 		turtle.place()
 	else
-		refuelBlocks(stone,64)
+		refuelBlocks(ref.stone,64)
 		turtle.place()
 	end
 end
 function tryPlaceWall()
-	if acZ==0 and acDir==3 then
+	if relCo.acZ==0 and relCo.acDir==3 then
 		placeStoneIfSolid()
-	elseif acZ==(sizeRight-1) and acDir==1 then
+	elseif relCo.acZ==(size.right-1) and relCo.acDir==1 then
 		placeStoneIfSolid()
 	end
 end
 function placeLayer()
 	-- lay bottom layer with stone
-	if acY==0 and prepareComplete then
-		if not compareBlockDown(stone) then
+	if relCo.acY==0 and prepareComplete then
+		if not compareBlockDown(ref.stone) then
 			digDown()
 		end
-		if select(stone) then
+		if select(ref.stone) then
 			turtle.placeDown()
 		else
-			refuelBlocks(stone,64)
+			refuelBlocks(ref.stone,64)
 			turtle.placeDown()
 		end
 	end
-	if acY==(sizeUp-1) then
-		if not compareBlockUp(stone) then
+	if relCo.acY==(size.up-1) then
+		if not compareBlockUp(ref.stone) then
 			up()
 			down()
 		end
-		if select(stone) then
+		if select(ref.stone) then
 			turtle.placeUp()
 		else
-			refuelBlocks(stone,64)
+			refuelBlocks(ref.stone,64)
 			turtle.placeUp()
 		end
 	end
 end
 function placeStoneIfSolid()
-	if not compareBlock(stone) and turtle.detect() then
+	if not compareBlock(ref.stone) and turtle.detect() then
 		fwd()
 		back()
-		if select(stone) then
+		if select(ref.stone) then
 			turtle.place()
 		else
-			refuelBlocks(stone,64)
+			refuelBlocks(ref.stone,64)
 			turtle.place()
 		end
 	end
+end
+
+--build program
+function registerAir(x,y,z)
+
+end
+function placeDefault(t,x,y,z,dv)--place directly
+	gotoB(x+1,y,z,2)
+	if slect(t,dv)
+		turtle.place()
+	--else
+	end
+end
+function placeWithRot(t,x,y,z,r)--use pistons
+end
+function placeHRot(t,x,y,z,r)--do not use pistons
+end
+function placeStairs(t,x,y,z,r)--use pistones
+end
+function placeTorch(t,x,y,z,r)--like redstone, needs other block; blocks placed against depend the rotation
+end
+function placeRedstone(t,x,y,z,r)--needs block below and has rotation
+end
+function placeDoor(t,x,y,z,r)--needs block below and has special rotation
+end
+function placeWater(t,x,y,z,r)--uses buckets
+	
+	if t=="minecraft:lava" then
+		
+	
+	elseif t=="minecraft:water" then
+		
+	
+	end
+	
+end
+function placeDoor(t,x,y,z,r)
+end
+function placeSomethingelse(t,x,y,z,r)
+end
+function placeStandingSign(t,x,y,z,r)
+end
+function placeWallSign(t,x,y,z,r)
+end
+function placeDoubleslab(t,x,y,z,r)
+end
+
+function placeBlock(block,prio,x,y,z,r)
+	local ptype=blockProperties[block]
+	if ptype==nil then
+		placeDefault(block,x,y,z,r)
+	return true
+	elseif ptype.priority==-2 then
+		return false
+	elseif ptype.priority==prio then
+		ptype[2](block,x,y,z,r)
+	return true
+	end
+	reportError("wrong arguments for placeBlock "..block.." "..x.." "..y.." "..z.." "..r)
+	return false
 end
 
 function prepare()
@@ -768,7 +965,7 @@ function prepare()
 	for i=1,16 do
 		turtle.select(i)
 		if turtle.getItemCount() >0 then
-			virtualSpace[i]={getItem(),turtle.getItemCount()}
+			virtualInventory[i]={getItem(),turtle.getItemCount()}
 		end
 	end
 	
@@ -782,18 +979,23 @@ function prepare()
 		end
 	until (not isChestAbove()) and (not isChestBelow())
 	
-	startX=acX
+	if buildTunnel then -- prepare build by 
+	-- searching for first indicator block
+	--while getBlockDown()~=indicatorBlock do
+	--	fwd()
+	--end
+	--for x=1,size.X do end
+	end
+	
 	prepareComplete=true
-	goto((offset+startX),0,0)
+	goto((offset+relCo.acX),0,0)
 	-- if specified (e.g. digtunnel 1 2 3 f) then search for the first block to start digging
 	if findfirst then
 		while not turtle.detect() do
 			fwd()
 		end
-		if acX>startX then
-			back()
-		end
 	end
+	startPar.start=relCo.acX
 end
 function digtunnel()
 	turtle.select(1)
@@ -801,7 +1003,7 @@ function digtunnel()
 	fwd()
 	placeLayer()
 	turnL()
-	while acY<(sizeUp-1) do
+	while relCo.acY<(size.up-1) do
 		if turtle.detect() and (compareBlock(gravel) or compareBlock(sand))then
 			wallup()
 		end
@@ -815,27 +1017,27 @@ function digtunnel()
 	local state=true
 	while state do
 	
-		if acZ==0 or acZ==1 then
+		if relCo.acZ==0 or relCo.acZ==1 then
 			turn(1)
 		end
 		
-		if acZ==(sizeRight-1) then
-			while acDir~=3 do
+		if relCo.acZ==(size.right-1) then
+			while relCo.acDir~=3 do
 				tryPlaceWall()
 				turnR()
 			end
 		end
-		if acY==sizeUp-1 then
+		if relCo.acY==size.up-1 then
 			fwd()
 		end
 		placeLayer()
-		for w=1,sizeRight-2 do
+		for w=1,size.right-2 do
 			fwd()
 			placeLayer()
 		end
 		tryPlaceWall()
-		if acY>0 then
-			if not (acZ==1 and acY==1) then
+		if relCo.acY>0 then
+			if not (relCo.acZ==1 and relCo.acY==1) then
 				down()
 				tryPlaceWall()
 				placeLayer()
@@ -847,37 +1049,34 @@ function digtunnel()
 	repos()
 end
 
+
 function main()
 	term.clear() 
 	term.setCursorPos(1,1)
-	print("Wellcome to the dig-master 5000!")
+	print("Wellcome to the tunnelbuilder 5000!")
 	if #tArgs > 0 then
 		if tArgs[1]=="o" then
 		--todo: use obsidian as borders for tunnel
 		elseif tArgs[1]=="c" then
 		--todo: custom pathing
 		else
-			if #tArgs > 3 then
-				if tArgs[4]=="f" then
+			if #tArgs > 1 then
+				if tArgs[2]=="f" then
 					findfirst=true
 				else
-					offset=tArgs[4]
+					offset=tArgs[2]
 				end
 			end
-			sizeRight=tArgs[1]
-			sizeUp=tArgs[2]
-			sizeLength=tArgs[3]
-			print("\nwidth= "..sizeRight)
-			print("height= "..sizeUp)
-			print("length= "..sizeLength.."\n")
+			size.length=tArgs[1]
+			print("length= "..size.length.."\n")
 		end
 	else
 		term.write("How wide (right side of turtule)\n is the tunnel?")
-		sizeRight=read()
+		size.right=read()
 		term.write("How high is the tunnel?")
-		sizeUp=read()
+		size.up=read()
 		term.write("How far should the tunnel reach? ")
-		sizeLength=read()
+		size.length=read()
 		term.write("place blocks at ceiling? y/n ")
 		if read()=="y" then
 			doCeiling=true
@@ -924,9 +1123,9 @@ function main()
 	term.clear()
 	term.setCursorPos(1,1)
 	report("starting with digging the tunnel")
-	while acX<(startX+sizeLength) do
+	while relCo.acX<(startPar.start+size.length) do
 		digtunnel()
-		completion=(math.floor((acX-startX)/sizeLength*100))
+		completion=(math.floor((relCo.acX-startPar.start)/size.length*100))
 		report()
 	end
 	reset()
